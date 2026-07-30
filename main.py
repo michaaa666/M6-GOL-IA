@@ -54,6 +54,9 @@ def handle_callback(call):
             response = requests.get(url, headers=headers, params=querystring)
             data = response.json()
             
+            if isinstance(data, dict):
+                data = data.get("result", data.get("response", []))
+            
             if not data or not isinstance(data, list):
                 bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento.")
             else:
@@ -73,7 +76,7 @@ def handle_callback(call):
         bot.send_message(call.message.chat.id, "🏆 **Ligas disponibles:**\n1. Liga MX\n2. La Liga\n3. Premier League")
     elif call.data == "analyze_bet":
         bot.answer_callback_query(call.id, "Listo para análisis...")
-        bot.send_message(call.message.chat.id, "📊 Envía el nombre del equipo que deseas analizar (ej: Real Madrid, Barcelona, Club America).")
+        bot.send_message(call.message.chat.id, "📊 Envía el nombre del equipo que deseas analizar (ej: Real Madrid, Barcelona, America).")
     elif call.data == "settings":
         bot.answer_callback_query(call.id, "Configuración")
         bot.send_message(call.message.chat.id, "⚙️ Sistema operando 24/7 en la nube.")
@@ -89,19 +92,22 @@ def handle_team_search(message):
             "x-rapidapi-host": API_HOST
         }
         
-        # Intento 1: Usando team_name
         querystring = {"action": "get_teams", "team_name": team_name}
         response = requests.get(url, headers=headers, params=querystring)
         data = response.json()
         
-        # Intento 2: Si falla, probamos con search
+        if isinstance(data, dict):
+            data = data.get("result", data.get("response", []))
+        
         if not data or not isinstance(data, list) or len(data) == 0:
             querystring = {"action": "get_teams", "search": team_name}
             response = requests.get(url, headers=headers, params=querystring)
             data = response.json()
+            if isinstance(data, dict):
+                data = data.get("result", data.get("response", []))
         
         if not data or not isinstance(data, list) or len(data) == 0:
-            bot.send_message(message.chat.id, f"❌ No se encontró información para '{team_name}'. Prueba escribiendo el nombre completo oficial.")
+            bot.send_message(message.chat.id, f"❌ No se encontró información para '{team_name}'. Prueba escribiendo el nombre completo.")
         else:
             team = data[0]
             t_name = team.get("team_name", "Desconocido")
@@ -121,6 +127,6 @@ def handle_team_search(message):
         bot.send_message(message.chat.id, "⚠️ Ocurrió un error al procesar el análisis del equipo.")
 
 if __name__ == "__main__":
-    print("Iniciando bot M6-GOL-IA con doble validación de equipos...")
+    print("Iniciando bot M6-GOL-IA con parseo robusto...")
     bot.infinity_polling()
 
