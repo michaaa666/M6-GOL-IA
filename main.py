@@ -42,25 +42,25 @@ def handle_callback(call):
     if call.data == "live_matches":
         bot.answer_callback_query(call.id, "Consultando partidos en vivo...")
         try:
-            url = "https://v3.football.api-sports.io/fixtures?live=all"
+            url = "https://apifootball3.p.rapidapi.com/"
+            querystring = {"action": "get_events", "match_live": "1"}
             headers = {
-                "x-rapidapi-key": "TU_API_KEY_AQUI",
-                "x-rapidapi-host": "api-football-v1.p.rapidapi.com"
+                "x-rapidapi-key": "44cce749a8msh1eeac7591aba73fp1212dbjsn510a23c7d8fd",
+                "x-rapidapi-host": "apifootball3.p.rapidapi.com"
             }
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, params=querystring)
             data = response.json()
             
-            matches = data.get("response", [])
-            if not matches:
-                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento.")
+            if not data or not isinstance(data, list):
+                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento o la respuesta está vacía.")
             else:
                 texto = "⚽ **Partidos en Vivo (En directo):**\n"
-                for match in matches[:5]:
-                    home = match["teams"]["home"]["name"]
-                    away = match["teams"]["away"]["name"]
-                    goals_home = match["goals"]["home"]
-                    goals_away = match["goals"]["away"]
-                    texto += f"• {home} {goals_home} - {goals_away} {away}\n"
+                for match in data[:5]:
+                    home = match.get("match_hometeam_name", "Local")
+                    away = match.get("match_awayteam_name", "Visitante")
+                    score_home = match.get("match_live_home_score", "0")
+                    score_away = match.get("match_live_away_score", "0")
+                    texto += f"• {home} {score_home} - {score_away} {away}\n"
                 bot.send_message(call.message.chat.id, texto)
         except Exception as e:
             bot.send_message(call.message.chat.id, "⚠️ Error al conectar con la API deportiva.")
@@ -80,6 +80,6 @@ def handle_all_messages(message):
     bot.reply_to(message, "Mensaje recibido. Procesando datos de apuestas...")
 
 if __name__ == "__main__":
-    print("Iniciando bot M6-GOL-IA con soporte para API...")
+    print("Iniciando bot M6-GOL-IA con API real...")
     bot.infinity_polling()
 
