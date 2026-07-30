@@ -7,7 +7,6 @@ import requests
 TOKEN = "8686894438:AAGmzCI2Av0jpATPGWM42UyRxvgRB2G8MVQ"
 bot = telebot.TeleBot(TOKEN)
 
-# Servidor HTTP temporal para que Render detecte el puerto abierto
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,7 +18,6 @@ def run_http_server():
     server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
     server.serve_forever()
 
-# Iniciar el servidor web en un hilo paralelo
 threading.Thread(target=run_http_server, daemon=True).start()
 
 @bot.message_handler(commands=['start', 'menu'])
@@ -43,20 +41,29 @@ def send_welcome_and_menu(message):
 def handle_callback(call):
     if call.data == "live_matches":
         bot.answer_callback_query(call.id, "Consultando partidos en vivo...")
-        
         try:
-            # Estructura lista para conectar con tu API de deportes (Ejemplo con API-Football)
-            # url = "https://v3.football.api-sports.io/fixtures?live=all"
-            # headers = {"x-apisports-key": "TU_API_KEY"}
-            # response = requests.get(url, headers=headers)
-            # data = response.json()
+            url = "https://v3.football.api-sports.io/fixtures?live=all"
+            headers = {
+                "x-rapidapi-key": "TU_API_KEY_AQUI",
+                "x-rapidapi-host": "api-football-v1.p.rapidapi.com"
+            }
+            response = requests.get(url, headers=headers)
+            data = response.json()
             
-            bot.send_message(
-                call.message.chat.id, 
-                "⚽ **Partidos en Vivo (Módulo API Activo):**\n• El sistema de solicitudes HTTP está configurado y listo para sincronizar marcadores en tiempo real."
-            )
+            matches = data.get("response", [])
+            if not matches:
+                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento.")
+            else:
+                texto = "⚽ **Partidos en Vivo (En directo):**\n"
+                for match in matches[:5]:
+                    home = match["teams"]["home"]["name"]
+                    away = match["teams"]["away"]["name"]
+                    goals_home = match["goals"]["home"]
+                    goals_away = match["goals"]["away"]
+                    texto += f"• {home} {goals_home} - {goals_away} {away}\n"
+                bot.send_message(call.message.chat.id, texto)
         except Exception as e:
-            bot.send_message(call.message.chat.id, "⚠️ Error al procesar la solicitud de la API deportiva.")
+            bot.send_message(call.message.chat.id, "⚠️ Error al conectar con la API deportiva.")
 
     elif call.data == "leagues":
         bot.answer_callback_query(call.id, "Cargando ligas...")
