@@ -1,6 +1,7 @@
 import os
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime
 import telebot
 import requests
 
@@ -29,7 +30,7 @@ def send_welcome_and_menu(message):
     markup.add(
         telebot.types.InlineKeyboardButton("⚽ Partidos en Vivo", callback_data="live_matches"),
         telebot.types.InlineKeyboardButton("🏆 Ligas Destacadas", callback_data="leagues"),
-        telebot.types.InlineKeyboardButton("📊 Analizar Apuesta", callback_data="analyze_bet"),
+        telebot.types.InlineKeyboardButton("📊 Analizar Apuesta (Partidos de Hoy)", callback_data="analyze_bet"),
         telebot.types.InlineKeyboardButton("⚙️ Configuración", callback_data="settings")
     )
     
@@ -73,60 +74,52 @@ def handle_callback(call):
 
     elif call.data == "leagues":
         bot.answer_callback_query(call.id, "Cargando ligas...")
-        bot.send_message(call.message.chat.id, "🏆 **Ligas disponibles:**\n1. Liga MX\n2. La Liga\n3. Premier League")
+        bot.send_message(call.message.chat.id, "🏆 **Ligas disponibles:**\n1. Liga MX\n2. La Liga\n3. Premier League\n4. Serie A\n5. Bundesliga")
+        
     elif call.data == "analyze_bet":
-        bot.answer_callback_query(call.id, "Listo para análisis...")
-        bot.send_message(call.message.chat.id, "📊 Envía el nombre del equipo que deseas analizar (ej: Real Madrid, Barcelona, America).")
+        bot.answer_callback_query(call.id, "Buscando partidos para analizar...")
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            url = f"https://{API_HOST}/"
+            querystring = {"action": "get_events", "from": today, "to": today}
+            headers = {
+                "x-rapidapi-key": API_KEY,
+                "x-rapidapi-host": API_HOST
+            }
+            response = requests.get(url, headers=headers, params=querystring)
+            data = response.json()
+            
+            if isinstance(data, dict):
+                data = data.get("result", data.get("response", []))
+                
+            if not data or not isinstance(data, list) or len(data) == 0:
+                bot.send_message(call.message.chat.id, f"📊 **Análisis de Apuestas ({today}):**\nNo se encontraron encuentros programados para el día de hoy en la API.")
+            else:
+                texto = f"📊 **Encuentros para Analizar hoy ({today}):**\n\n"
+                for match in data[:8]:
+                    league = match.get("league_name", "Liga")
+                    home = match.get("match_hometeam_name", "Local")
+                    away = match.get("match_awayteam_name", "Visitante")
+                    time = match.get("match_time", "Por definir")
+                    status = match.get("match_status", "")
+                    
+                    texto += f"🏆 *{league}*\n"
+                    texto += f"⚔️ {home} vs {away}\n"
+                    texto += f"⏰ Hora: {time} | Estado: {status or 'Programado'}\n\n"
+                
+                bot.send_message(call.message.chat.id, texto, parse_mode="Markdown")
+        except Exception as e:
+            bot.send_message(call.message.chat.id, "⚠️ Error al consultar los encuentros del día para análisis.")
+
     elif call.data == "settings":
         bot.answer_callback_query(call.id, "Configuración")
         bot.send_message(call.message.chat.id, "⚙️ Sistema operando 24/7 en la nube.")
 
 @bot.message_handler(func=lambda message: True)
-def handle_team_search(message):
-    team_name = message.text.strip()
-    bot.reply_to(message, f"🔍 Buscando información para: **{team_name}**...", parse_mode="Markdown")
-    try:
-        url = f"https://{API_HOST}/"
-        headers = {
-            "x-rapidapi-key": API_KEY,
-            "x-rapidapi-host": API_HOST
-        }
-        
-        querystring = {"action": "get_teams", "team_name": team_name}
-        response = requests.get(url, headers=headers, params=querystring)
-        data = response.json()
-        
-        if isinstance(data, dict):
-            data = data.get("result", data.get("response", []))
-        
-        if not data or not isinstance(data, list) or len(data) == 0:
-            querystring = {"action": "get_teams", "search": team_name}
-            response = requests.get(url, headers=headers, params=querystring)
-            data = response.json()
-            if isinstance(data, dict):
-                data = data.get("result", data.get("response", []))
-        
-        if not data or not isinstance(data, list) or len(data) == 0:
-            bot.send_message(message.chat.id, f"❌ No se encontró información para '{team_name}'. Prueba escribiendo el nombre completo.")
-        else:
-            team = data[0]
-            t_name = team.get("team_name", "Desconocido")
-            t_country = team.get("country_name", "No especificado")
-            t_founded = team.get("team_founded", "N/D")
-            t_logo = team.get("team_badge", "")
-            
-            texto = f"📊 **Análisis de Equipo**\n\n"
-            texto += f"🛡️ **Equipo:** {t_name}\n"
-            texto += f"🌍 **País:** {t_country}\n"
-            texto += f"📅 **Fundación:** {t_founded}\n"
-            if t_logo:
-                texto += f"🔗 [Ver Escudo Oficial]({t_logo})\n"
-            
-            bot.send_message(message.chat.id, texto, parse_mode="Markdown")
-    except Exception as e:
-        bot.send_message(message.chat.id, "⚠️ Ocurrió un error al procesar el análisis del equipo.")
+def handle_general_messages(message):
+    bot.reply_to(message, "💡 Usa los botones del menú interactivo o escribe /start para ver las opciones disponibles para tus apuestas.")
 
 if __name__ == "__main__":
-    print("Iniciando bot M6-GOL-IA con parseo robusto...")
+    print("Iniciando bot M6-GOL-IA enfocado en encuentros...")
     bot.infinity_polling()
 
