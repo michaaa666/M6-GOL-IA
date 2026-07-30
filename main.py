@@ -32,15 +32,46 @@ def send_welcome_and_menu(message):
         telebot.types.InlineKeyboardButton("⚽ Partidos en Vivo", callback_data="live_matches"),
         telebot.types.InlineKeyboardButton("🛡️ Info de Clubes", callback_data="club_info_prompt"),
         telebot.types.InlineKeyboardButton("📊 Analizar Apuesta", callback_data="analyze_bet"),
-        telebot.types.InlineKeyboardButton("🎲 Armar Parley", callback_data="build_parley")
+        telebot.types.InlineKeyboardButton("🎲 Armar Parley", callback_data="build_parley"),
+        telebot.types.InlineKeyboardButton("🧮 Calc. Bankroll", callback_data="bankroll_help")
     )
     
     bot.reply_to(
         message, 
-        "¡Bienvenido apostador! **M6-GOL-IA** está en línea y operando al 100%.\n\nSelecciona una opción del panel maestro:", 
+        "¡Bienvenido apostador! **M6-GOL-IA** está en línea y operando al 100%.\n\nSelecciona una opción del panel maestro o usa `/calc [capital] [cuota]`:", 
         reply_markup=markup, 
         parse_mode="Markdown"
     )
+
+@bot.message_handler(commands=['calc'])
+def calculate_bankroll(message):
+    try:
+        parts = message.text.split()
+        if len(parts) < 3:
+            bot.reply_to(message, "⚠️ Uso incorrecto.\nEjemplo: `/calc 1000 1.85`\n(Ingresa tu capital total y la cuota decimal)", parse_mode="Markdown")
+            return
+        
+        capital = float(parts[1])
+        cuota = float(parts[2])
+        
+        stake_2 = round(capital * 0.02, 2)
+        stake_5 = round(capital * 0.05, 2)
+        
+        ganancia_2 = round(stake_2 * cuota, 2)
+        ganancia_5 = round(stake_5 * cuota, 2)
+        
+        texto = f"🧮 **Calculadora de Bankroll y Apuestas**\n\n"
+        texto += f"💰 **Capital Total:** ${capital}\n"
+        texto += f"📈 **Cuota Seleccionada:** {cuota}\n\n"
+        texto += f"🟢 **Stake Conservador (2%):** ${stake_2}\n"
+        texto += f"   └ Retorno total estimado: ${ganancia_2}\n\n"
+        texto += f"🟡 **Stake Moderado (5%):** ${stake_5}\n"
+        texto += f"   └ Retorno total estimado: ${ganancia_5}\n\n"
+        texto += f"⚠️ _Gestiona tu bankroll con disciplina y cabeza fría._"
+        
+        bot.reply_to(message, texto, parse_mode="Markdown")
+    except ValueError:
+        bot.reply_to(message, "⚠️ Por favor ingresa números válidos. Ejemplo: `/calc 500 1.75`", parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -57,7 +88,7 @@ def handle_callback(call):
                 data = data.get("result", data.get("response", []))
             
             if not data or not isinstance(data, list) or len(data) == 0:
-                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento en el mundo. ¡Inténtalo más tarde cuando comience la jornada!")
+                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento.")
             else:
                 texto = "⚽ **Partidos en Vivo (En directo):**\n\n"
                 for match in data[:8]:
@@ -74,6 +105,10 @@ def handle_callback(call):
     elif call.data == "club_info_prompt":
         bot.answer_callback_query(call.id, "Búsqueda de clubes")
         bot.send_message(call.message.chat.id, "🛡️ **Información de Clubes:**\nEnvía directamente al chat el nombre del equipo que deseas consultar (Ejemplo: `Real Madrid`, `Barcelona`, `Arsenal`).", parse_mode="Markdown")
+
+    elif call.data == "bankroll_help":
+        bot.answer_callback_query(call.id, "Calculadora de Bankroll")
+        bot.send_message(call.message.chat.id, "🧮 **Calculadora de Bankroll:**\n\nPara calcular tu apuesta y gestión de riesgo, escribe el comando:\n`/calc [tu_capital] [cuota]`\n\n*Ejemplo:* `/calc 1000 1.85`", parse_mode="Markdown")
 
     elif call.data == "analyze_bet":
         bot.answer_callback_query(call.id, "Analizando encuentros...")
@@ -97,8 +132,8 @@ def handle_callback(call):
                     away = match.get("match_awayteam_name", "Visitante")
                     league = match.get("league_name", "Liga")
                     prediction = random.choice([
-                        f"🔥 Pronóstico: Gana {home} o Empate (Doble Oportunidad)",
-                        f"⚽ Pronóstico: Más de 1.5 goles en el partido",
+                        f"🔥 Pronóstico: Gana {home} o Empate",
+                        f"⚽ Pronóstico: Más de 1.5 goles",
                         f"🎯 Pronóstico: Ambos anotan (Sí)",
                         f"⚡ Pronóstico: Gana {away}"
                     ])
@@ -170,7 +205,7 @@ def handle_team_search_or_text(message):
                 data = data.get("result", data.get("response", []))
         
         if not data or not isinstance(data, list) or len(data) == 0:
-            bot.send_message(message.chat.id, f"❌ No se encontró información para '{team_name}'. Verifica que el nombre esté bien escrito o prueba con otro club.")
+            bot.send_message(message.chat.id, f"❌ No se encontró información para '{team_name}'. Verifica el nombre o usa la calculadora con `/calc [capital] [cuota]`.")
         else:
             team = data[0]
             t_name = team.get("team_name", "Desconocido")
@@ -190,6 +225,6 @@ def handle_team_search_or_text(message):
         bot.send_message(message.chat.id, "⚠️ Ocurrió un error al buscar la información del club.")
 
 if __name__ == "__main__":
-    print("Iniciando bot M6-GOL-IA definitivo...")
+    print("Iniciando bot M6-GOL-IA con calculadora de bankroll...")
     bot.infinity_polling()
 
