@@ -7,6 +7,9 @@ import requests
 TOKEN = "8686894438:AAGmzCI2Av0jpATPGWM42UyRxvgRB2G8MVQ"
 bot = telebot.TeleBot(TOKEN)
 
+API_KEY = "44cce749a8msh1eeac7591aba73fp1212dbjsn510a23c7d8fd"
+API_HOST = "apifootball3.p.rapidapi.com"
+
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -42,17 +45,17 @@ def handle_callback(call):
     if call.data == "live_matches":
         bot.answer_callback_query(call.id, "Consultando partidos en vivo...")
         try:
-            url = "https://apifootball3.p.rapidapi.com/"
+            url = f"https://{API_HOST}/"
             querystring = {"action": "get_events", "match_live": "1"}
             headers = {
-                "x-rapidapi-key": "44cce749a8msh1eeac7591aba73fp1212dbjsn510a23c7d8fd",
-                "x-rapidapi-host": "apifootball3.p.rapidapi.com"
+                "x-rapidapi-key": API_KEY,
+                "x-rapidapi-host": API_HOST
             }
             response = requests.get(url, headers=headers, params=querystring)
             data = response.json()
             
             if not data or not isinstance(data, list):
-                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento o la respuesta está vacía.")
+                bot.send_message(call.message.chat.id, "⚽ **Partidos en Vivo:**\nNo hay partidos jugándose en este momento.")
             else:
                 texto = "⚽ **Partidos en Vivo (En directo):**\n"
                 for match in data[:5]:
@@ -70,16 +73,42 @@ def handle_callback(call):
         bot.send_message(call.message.chat.id, "🏆 **Ligas disponibles:**\n1. Liga MX\n2. La Liga\n3. Premier League")
     elif call.data == "analyze_bet":
         bot.answer_callback_query(call.id, "Listo para análisis...")
-        bot.send_message(call.message.chat.id, "📊 Envía el nombre del partido o equipo que deseas consultar.")
+        bot.send_message(call.message.chat.id, "📊 Envía el nombre del equipo que deseas analizar (ej: Real Madrid, Barcelona, América).")
     elif call.data == "settings":
         bot.answer_callback_query(call.id, "Configuración")
         bot.send_message(call.message.chat.id, "⚙️ Sistema operando 24/7 en la nube.")
 
 @bot.message_handler(func=lambda message: True)
-def handle_all_messages(message):
-    bot.reply_to(message, "Mensaje recibido. Procesando datos de apuestas...")
+def handle_team_search(message):
+    team_name = message.text.strip()
+    bot.reply_to(message, f"🔍 Buscando información para: **{team_name}**...", parse_mode="Markdown")
+    try:
+        url = f"https://{API_HOST}/"
+        querystring = {"action": "get_teams", "team_name": team_name}
+        headers = {
+            "x-rapidapi-key": API_KEY,
+            "x-rapidapi-host": API_HOST
+        }
+        response = requests.get(url, headers=headers, params=querystring)
+        data = response.json()
+        
+        if not data or not isinstance(data, list) or len(data) == 0:
+            bot.send_message(message.chat.id, f"❌ No se encontró información para '{team_name}'. Intenta con otro equipo.")
+        else:
+            team = data[0]
+            t_name = team.get("team_name", "Desconocido")
+            t_logo = team.get("team_badge", "")
+            
+            texto = f"📊 **Análisis de Equipo**\n\n"
+            texto += f"🛡️ **Equipo:** {t_name}\n"
+            if t_logo:
+                texto += f"🔗 [Ver Escudo Oficial]({t_logo})\n"
+            texto += f"\n_Estado:_ Datos sincronizados correctamente desde la nube."
+            bot.send_message(message.chat.id, texto, parse_mode="Markdown")
+    except Exception as e:
+        bot.send_message(message.chat.id, "⚠️ Ocurrió un error al procesar el análisis del equipo.")
 
 if __name__ == "__main__":
-    print("Iniciando bot M6-GOL-IA con API real...")
+    print("Iniciando bot M6-GOL-IA con análisis interactivo...")
     bot.infinity_polling()
 
